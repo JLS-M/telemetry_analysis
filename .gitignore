@@ -4,3 +4,6 @@ telemetry_data/*
 # Ignore Python runtime caches
 __pycache__/
 *.pyc
+
+# Ignore .idea local setup files created by pycharm
+.idea/
