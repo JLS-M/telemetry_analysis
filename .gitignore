@@ -1,0 +1,6 @@
+# Ignore heavy binary telemetry files
+telemetry_data/*
+
+# Ignore Python runtime caches
+__pycache__/
+*.pyc
