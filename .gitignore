@@ -1,9 +1,13 @@
 # Ignore heavy binary telemetry files
 telemetry_data/*
 
-# Ignore Python runtime caches
+# Ignore Python runtime caches and virtual environment
 __pycache__/
 *.pyc
+.venv/
 
 # Ignore .idea local setup files created by pycharm
 .idea/
+
+# Ignore third-party downloaded scripts
+ldparser.py
