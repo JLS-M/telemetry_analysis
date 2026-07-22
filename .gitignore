@@ -10,4 +10,4 @@ __pycache__/
 .idea/
 
 # Ignore third-party downloaded scripts
-ldparser.py
+external_tools/ldparser.py
