@@ -49,6 +49,25 @@ def load_acc_telemetry(ld_file_path):
     if not channel_data:
         raise ValueError("No valid channels were extracted from this file.")
 
+    # 3.5 Calculate Cumulative Distance from Speed & Speed_Time
+    if "Speed" in channel_data and "Speed_Time" in channel_data:
+        speed_vals = channel_data["Speed"]  # m/s
+        speed_times = channel_data["Speed_Time"]
+
+        # Time step deltas
+        dt = np.diff(speed_times, prepend=speed_times[0])
+
+        # Integrate speed over time to get lap distance (meters)
+        calc_dist = np.cumsum(speed_vals * dt)
+
+        # Store Speed's distance array directly
+        channel_data["Speed_Distance"] = calc_dist
+
+        # Build 2-column Lookup Matrix [Time, Distance] for other channels
+        time_dist_matrix = np.column_stack((speed_times, calc_dist))
+        channel_data["Time_Distance_Matrix"] = [time_dist_matrix]
+
+
     # 4. Return as a single DataFrame (using max length padding with NaN)
     # This preserves EVERY raw value cleanly without modifying or interpolating any data!
     df = pd.DataFrame(
