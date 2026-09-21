@@ -1,5 +1,5 @@
 import matplotlib.pyplot as plt
-import numpy as np  # <-- ADDED
+import numpy as np
 import pandas as pd
 from my_tools.data_loader import load_acc_telemetry
 
@@ -17,7 +17,7 @@ df = load_acc_telemetry(file_path)
 
 print("\n--- Telemetry Loaded Successfully! ---")
 print("Data Shape (Rows, Columns):", df.shape)
-print("\nFirst 5 rows:")
+print("\nSample rows:")
 print(df.head())
 
 
@@ -35,11 +35,11 @@ def get_channel_x(df, channel_name, mode="time"):
 
 
 # Set plot mode here: 'time' or 'distance'
-PLOT_MODE = "time"  # <-- ADDED
+PLOT_MODE = "time"
 
 # Drop NaN rows caused by length padding for plotting
 speed_data = df[["Speed"]].dropna()
-speed_x = get_channel_x(df, "Speed", mode=PLOT_MODE)  # <-- ADDED
+speed_x = get_channel_x(df, "Speed", mode=PLOT_MODE)
 
 # --- SPEED PLOT ---
 plt.figure(figsize=(12, 5))

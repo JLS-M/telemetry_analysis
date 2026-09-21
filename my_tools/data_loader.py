@@ -35,14 +35,16 @@ def load_acc_telemetry(ld_file_path):
         try:
             ch = ld[motec_name]
             if ch is not None and len(ch.data) > 0:
-                # Channel's exact raw sample values
-                channel_data[clean_name] = ch.data
-
-                # Channel's exact raw time vector (using sample frequency)
-                freq = getattr(ch, "freq", 50.0)
-                channel_data[f"{clean_name}_Time"] = (
-                        np.arange(len(ch.data)) / freq
-                )
+                # Check explicitly if freq exists and is valid
+                if hasattr(ch, "freq") and ch.freq is not None and ch.freq > 0:
+                    channel_data[clean_name] = ch.data
+                    channel_data[f"{clean_name}_Time"] = (
+                            np.arange(len(ch.data)) / ch.freq
+                    )
+                else:
+                    print(
+                        f"Error: Channel '{motec_name}' ({clean_name}) is missing a valid 'freq' attribute."
+                    )
         except Exception:
             print(f"Warning: Channel '{motec_name}' not found in telemetry file.")
 
@@ -67,10 +69,11 @@ def load_acc_telemetry(ld_file_path):
         time_dist_matrix = np.column_stack((speed_times, calc_dist))
         channel_data["Time_Distance_Matrix"] = [time_dist_matrix]
 
-
-    # 4. Return as a single DataFrame (using max length padding with NaN)
-    # This preserves EVERY raw value cleanly without modifying or interpolating any data!
+    # 4. Return as a single DataFrame (using max length padding with NaN [adds NaN
+    # to the shorter arrays to complete their length])
+    # This preserves EVERY raw value cleanly without modifying or interpolating any data
     df = pd.DataFrame(
+        # Converts the raw NumPy array v into a Pandas Series object, which then allows for length padding with NaN
         dict([(k, pd.Series(v)) for k, v in channel_data.items()])
     )
 
