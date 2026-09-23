@@ -5,7 +5,6 @@ from tkinter import filedialog
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from scipy.signal import savgol_filter
 from my_tools.data_loader import load_acc_telemetry
 
 # --- TELL PANDAS TO NEVER TRUNCATE COLUMNS ---
@@ -21,7 +20,7 @@ root = tk.Tk()
 root.withdraw()
 root.attributes("-topmost", True)
 
-# Open multi-file selection dialog (askopenfilenames)
+# Open multi-file selection dialog
 file_paths = filedialog.askopenfilenames(
     initialdir=data_folder_path,
     title="Select MoTeC Telemetry Files (Hold Ctrl/Cmd to select multiple)",
@@ -30,7 +29,6 @@ file_paths = filedialog.askopenfilenames(
 
 root.destroy()
 
-# Check if the user selected any files
 if not file_paths:
     print("\nNo files selected. Exiting script.")
     exit()
@@ -51,8 +49,24 @@ def get_channel_x(df, channel_name, mode="time"):
         return np.interp(ch_time, matrix[:, 0], matrix[:, 1])
 
 
-# Set plot mode here: 'time' or 'distance'
-PLOT_MODE = "time"
+# ------------------------------------------------------------------
+# MoTeC-style Moving Average Filter
+# ------------------------------------------------------------------
+def motec_smooth(data, num_samples=5):
+    """
+    Smooths data using a moving average over 'num_samples',
+    matching MoTeC i2's default channel smoothing behavior.
+    """
+    if num_samples <= 1:
+        return data
+    # Use mode='same' to keep output vector length equal to input vector
+    window = np.ones(num_samples) / num_samples
+    return np.convolve(data, window, mode="same")
+
+
+# --- SETTINGS ---
+PLOT_MODE = "time"  # 'time' or 'distance'
+SMOOTH_SAMPLES = 5  # Number of samples for MoTeC-style smoothing (e.g. 5 to 10 samples)
 
 # Palette for multi-lap raw/filtered pairs
 colors = ["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd", "#8c564b"]
@@ -60,14 +74,12 @@ colors = ["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd", "#8c564b"]
 # --- SETUP PLOT ---
 plt.figure(figsize=(12, 6))
 
-# Loop over all selected telemetry files
 for idx, path in enumerate(file_paths):
     filename = os.path.basename(path)
     print(f"\nLoading: {filename}")
 
     df = load_acc_telemetry(path)
 
-    # Extract clean throttle position data and corresponding time vector
     throttle_data = df["Throttle"].dropna().values
     throttle_time = df["Throttle_Time"].dropna().values
 
@@ -75,37 +87,14 @@ for idx, path in enumerate(file_paths):
         print(f"Skipping {filename}: insufficient throttle data.")
         continue
 
-    # Get X vector (Time or Distance) using the helper
     throttle_x = get_channel_x(df, "Throttle", mode=PLOT_MODE)
 
-    # --- SAVITZKY-GOLAY FILTERING ---
-    dt = np.diff(throttle_time, prepend=throttle_time[0])
-    mean_dt = np.mean(dt[1:]) if len(dt) > 1 else 0.02
-    fs = 1.0 / mean_dt if mean_dt > 0 else 50.0
+    # Apply MoTeC-style moving average
+    throttle_filtered = motec_smooth(throttle_data, num_samples=SMOOTH_SAMPLES)
 
-    # Set window length to ~0.2s of data (must be an odd integer)
-    window_len = int(round(0.2 * fs))
-    if window_len % 2 == 0:
-        window_len += 1
-    window_len = max(
-        5,
-        min(
-            window_len,
-            len(throttle_data) - 1
-            if len(throttle_data) % 2 != 0
-            else len(throttle_data) - 2,
-        ),
-    )
-
-    poly_order = 2
-    throttle_filtered = savgol_filter(
-        throttle_data, window_length=window_len, polyorder=poly_order
-    )
-
-    # Assign base color for the lap
     color = colors[idx % len(colors)]
 
-    # 1. Plot Raw Throttle (dashed / semi-transparent)
+    # 1. Plot Raw Throttle
     plt.plot(
         throttle_x,
         throttle_data,
@@ -116,18 +105,20 @@ for idx, path in enumerate(file_paths):
         alpha=0.5,
     )
 
-    # 2. Plot Filtered Throttle (solid line)
+    # 2. Plot Filtered Throttle
     plt.plot(
         throttle_x,
         throttle_filtered,
-        label=f"{filename} (Filtered)",
+        label=f"{filename} (MoTeC Smooth {SMOOTH_SAMPLES} samples)",
         color=color,
         linewidth=1.8,
         alpha=0.9,
     )
 
 # --- FORMAT PLOT ---
-plt.title(f"Throttle Position (Raw vs. Filtered) vs {PLOT_MODE.capitalize()}")
+plt.title(
+    f"Throttle Position (Raw vs. MoTeC Smooth) vs {PLOT_MODE.capitalize()}"
+)
 plt.xlabel("Lap Distance (m)" if PLOT_MODE == "distance" else "Lap Time (s)")
 plt.ylabel("Throttle Position (%)")
 plt.ylim(-5, 105)
@@ -136,5 +127,5 @@ plt.legend(loc="best", fontsize="small")
 plt.tight_layout()
 
 fig = plt.gcf()
-fig.canvas.manager.set_window_title("Throttle Filter Overlay")
+fig.canvas.manager.set_window_title("MoTeC Throttle Smoothing Overlay")
 plt.show()
