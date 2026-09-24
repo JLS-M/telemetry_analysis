@@ -66,7 +66,7 @@ def motec_smooth(data, num_samples=5):
 
 # --- SETTINGS ---
 PLOT_MODE = "time"  # 'time' or 'distance'
-SMOOTH_SAMPLES = 5  # Number of samples for MoTeC-style smoothing (e.g. 5 to 10 samples)
+SMOOTH_SAMPLES = 9  # Number of samples for MoTeC-style smoothing (e.g. 5 to 10 samples)
 
 # Palette for multi-lap raw/filtered pairs
 colors = ["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd", "#8c564b"]
