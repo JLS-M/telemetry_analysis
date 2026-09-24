@@ -16,12 +16,11 @@ from tkinter import filedialog
 
 import matplotlib.pyplot as plt
 import numpy as np
-import pandas as pd
-from my_tools.data_loader import load_acc_telemetry
+from my_tools.data_processing.telemetry_loader import load_acc_telemetry
 
 
 # Set default folder path
-data_folder_path = os.path.abspath("../telemetry_data")
+data_folder_path = os.path.abspath("../../telemetry_data")
 
 
 def motec_smooth(data, num_samples=9):
