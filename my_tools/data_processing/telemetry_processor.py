@@ -141,7 +141,6 @@ def process_outing_throttle(
                 f"Warning: Could not extract lap number from '{filename}'. Using index {lap_num}."
             )
 
-        # Ensure total_coasting_time is included in the output dictionary
         lap_data.append(
             {
                 "filename": filename,
@@ -169,3 +168,121 @@ def process_outing_throttle(
     )
 
     return {"avg_pct": avg_pct, "laps": lap_data}
+
+
+def process_outing_brake_speed(
+    file_paths,
+    min_brake_rate=80.0,
+    smooth_samples=9,
+    brake_channel="Brake",
+    time_channel="Brake_Time",
+):
+    """Calculates average brake application speed (%/s) per lap for rates >= min_brake_rate."""
+    lap_numbers = []
+    avg_brake_speeds = []
+
+    for idx, path in enumerate(file_paths, start=1):
+        filename = os.path.basename(path)
+        df = load_acc_telemetry(path)
+
+        lap_num = extract_lap_number(filename)
+        if lap_num is None:
+            lap_num = idx
+
+        brake_col = next(
+            (c for c in df.columns if c.lower() == brake_channel.lower()), None
+        )
+        time_col = next(
+            (
+                c
+                for c in df.columns
+                if c.lower() in [time_channel.lower(), "speed_time", "time"]
+            ),
+            None,
+        )
+
+        if brake_col and time_col:
+            clean_df = df[[brake_col, time_col]].dropna().reset_index(drop=True)
+
+            brakes = clean_df[brake_col].values
+            times = clean_df[time_col].values
+
+            if len(brakes) < 2:
+                continue
+
+            dt = np.diff(times, prepend=times[0])
+
+            brakes_smoothed = motec_smooth(brakes, num_samples=smooth_samples)
+            brake_speed = compute_derivative(brakes_smoothed, dt)
+
+            active_application_rates = brake_speed[
+                brake_speed >= min_brake_rate
+            ]
+
+            if len(active_application_rates) > 0:
+                lap_numbers.append(lap_num)
+                avg_brake_speeds.append(
+                    float(np.mean(active_application_rates))
+                )
+
+    return lap_numbers, avg_brake_speeds
+
+
+def process_outing_brake_release_speed(
+    file_paths,
+    min_release_rate=10.0,
+    smooth_samples=9,
+    brake_channel="Brake",
+    time_channel="Brake_Time",
+):
+    """Calculates average brake release speed (%/s) per lap for release rates >= 10%/s (when dBrake/dt < 0)."""
+    lap_numbers = []
+    avg_release_speeds = []
+
+    for idx, path in enumerate(file_paths, start=1):
+        filename = os.path.basename(path)
+        df = load_acc_telemetry(path)
+
+        lap_num = extract_lap_number(filename)
+        if lap_num is None:
+            lap_num = idx
+
+        brake_col = next(
+            (c for c in df.columns if c.lower() == brake_channel.lower()), None
+        )
+        time_col = next(
+            (
+                c
+                for c in df.columns
+                if c.lower() in [time_channel.lower(), "speed_time", "time"]
+            ),
+            None,
+        )
+
+        if brake_col and time_col:
+            clean_df = df[[brake_col, time_col]].dropna().reset_index(drop=True)
+
+            brakes = clean_df[brake_col].values
+            times = clean_df[time_col].values
+
+            if len(brakes) < 2:
+                continue
+
+            dt = np.diff(times, prepend=times[0])
+
+            brakes_smoothed = motec_smooth(brakes, num_samples=smooth_samples)
+            brake_speed = compute_derivative(brakes_smoothed, dt)
+
+            # Release phase: derivative is negative (dBrake/dt < 0) AND absolute rate >= min_release_rate (10%/s)
+            release_mask = (brake_speed < 0.0) & (
+                np.abs(brake_speed) >= min_release_rate
+            )
+            active_release_rates = np.abs(brake_speed[release_mask])
+
+            if len(active_release_rates) > 0:
+                lap_numbers.append(lap_num)
+                avg_release_speeds.append(
+                    float(np.mean(active_release_rates))
+                )
+
+    return lap_numbers, avg_release_speeds
