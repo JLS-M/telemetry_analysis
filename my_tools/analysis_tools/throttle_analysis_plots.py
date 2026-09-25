@@ -34,7 +34,7 @@ def plot_throttle_comparison(data_o1, data_o2):
     ax1.set_xticks([0, 1])
     ax1.set_xticklabels(["Outing 1", "Outing 2"])
     ax1.set_title(
-        f"Average Full Throttle (>= {THROTTLE_THRESHOLD:.0f}%)",
+        f"Average Full Throttle % (>= {THROTTLE_THRESHOLD:.0f}%)",
         fontsize=11,
         pad=12,
     )
@@ -72,16 +72,16 @@ def plot_throttle_comparison(data_o1, data_o2):
         )
 
     ax2.set_title(
-        f"Full Throttle % (>= {THROTTLE_THRESHOLD:.0f}%)", fontsize=11, pad=12
+        f"Per-lap Full Throttle % (>= {THROTTLE_THRESHOLD:.0f}%)", fontsize=11, pad=12
     )
     ax2.set_xlabel("Lap Number", fontsize=10)
-    ax2.set_ylabel("Percentage (%)", fontsize=10)
+    ax2.set_ylabel("Full Throttle %", fontsize=10)
     apply_shared_y_limits(ax2, pcts_o1, pcts_o2)
     ax2.grid(True, linestyle="--", alpha=0.6)
     ax2.legend(loc="best")
 
     ax3.set_title(
-        "Avg Positive Throttle Application Speed", fontsize=11, pad=12
+        "Avg Throttle Application Speed", fontsize=11, pad=12
     )
     ax3.set_xlabel("Lap Number", fontsize=10)
     ax3.set_ylabel("Throttle Speed (%/s)", fontsize=10)

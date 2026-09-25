@@ -120,7 +120,7 @@ def process_outing_throttle(
         throttle_smoothed = motec_smooth(throttle, num_samples=smooth_samples)
         throttle_speed = compute_derivative(throttle_smoothed, dt)
 
-        positive_application_mask = throttle_speed > 0.0
+        positive_application_mask = throttle_speed > 50.0
 
         if np.any(positive_application_mask):
             avg_throttle_speed = float(
