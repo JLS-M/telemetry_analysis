@@ -52,3 +52,25 @@ def get_outing_files(outing_name, initial_dir=None):
 
     root.destroy()
     return list(file_paths)
+
+def apply_shared_y_limits(ax, *data_lists):
+    """Sets Y-axis bounds: 70% of min value and 130% (+30%) of max value across input series."""
+    combined = []
+    for d in data_lists:
+        if d:
+            combined.extend(d)
+
+    if combined:
+        min_val = min(combined)
+        max_val = max(combined)
+
+        # Handle edge cases where values are zero or negative
+        y_min = min_val * 0.7 if min_val > 0 else min_val * 1.3
+        y_max = max_val * 1.3 if max_val > 0 else max_val * 0.7
+
+        # Handle flat signals where min and max are equal
+        if y_min == y_max:
+            y_min = y_min * 0.7 if y_min != 0 else -1.0
+            y_max = y_max * 1.3 if y_max != 0 else 1.0
+
+        ax.set_ylim(bottom=y_min, top=y_max)

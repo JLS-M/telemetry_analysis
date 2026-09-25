@@ -1,5 +1,9 @@
 import matplotlib.pyplot as plt
-from my_tools.plotting.style_utils import apply_shared_y_limits, format_x_ticks
+from my_tools.data_processing.signal_utils import (
+    apply_shared_y_limits,
+    get_outing_files,
+)
+from my_tools.data_processing.telemetry_processor import process_outing_throttle
 
 COLORS = {"Outing 1": "#1f77b4", "Outing 2": "#ff7f0e"}
 THROTTLE_THRESHOLD = 95.0
@@ -35,7 +39,7 @@ def plot_throttle_comparison(data_o1, data_o2):
         pad=12,
     )
     ax1.set_ylabel("Full Throttle %", fontsize=10)
-    apply_shared_y_limits(ax1, [data_o1["avg_pct"], data_o2["avg_pct"]])
+    apply_shared_y_limits(ax1, [data_o1["avg_pct"]], [data_o2["avg_pct"]])
     ax1.grid(axis="y", linestyle="--", alpha=0.6)
 
     pcts_o1 = [item["pct"] for item in data_o1["laps"]]
@@ -85,52 +89,26 @@ def plot_throttle_comparison(data_o1, data_o2):
     ax3.grid(True, linestyle="--", alpha=0.6)
     ax3.legend(loc="best")
 
-    laps_o1 = [item["lap_num"] for item in data_o1["laps"]]
-    laps_o2 = [item["lap_num"] for item in data_o2["laps"]]
-    format_x_ticks([ax2, ax3], laps_o1, laps_o2)
-
     plt.tight_layout()
     fig.canvas.manager.set_window_title("Throttle Analysis - Outing Comparison")
 
 
-def plot_coasting_comparison(data_o1, data_o2):
-    """Renders single scatter plot for total pre-braking coasting time per lap."""
-    fig, ax = plt.subplots(figsize=(10, 6))
-    outings = [("Outing 1", data_o1), ("Outing 2", data_o2)]
-
-    coasting_o1 = [item["total_coasting_time"] for item in data_o1["laps"]]
-    coasting_o2 = [item["total_coasting_time"] for item in data_o2["laps"]]
-
-    for name, data in outings:
-        laps = [item["lap_num"] for item in data["laps"]]
-        coasting = [item["total_coasting_time"] for item in data["laps"]]
-
-        ax.scatter(
-            laps,
-            coasting,
-            color=COLORS[name],
-            label=name,
-            s=80,
-            alpha=0.85,
-            edgecolor="black",
-            linewidth=0.8,
-            zorder=3,
-        )
-
-    ax.set_title(
-        "Total Pre-Braking Coasting Time per Lap\nby Lap Number",
-        fontsize=12,
-        pad=15,
+def run_throttle_analysis(outing1_files, outing2_files):
+    """Processes throttle telemetry and renders the comparison figure."""
+    data_o1 = process_outing_throttle(
+        outing1_files, "Outing 1", full_throttle_threshold=THROTTLE_THRESHOLD
     )
-    ax.set_xlabel("Lap Number", fontsize=11)
-    ax.set_ylabel("Total Pre-Braking Coasting Time (s)", fontsize=11)
-    apply_shared_y_limits(ax, coasting_o1, coasting_o2)
-    ax.grid(True, linestyle="--", alpha=0.6)
-    ax.legend(loc="best", fontsize=10)
+    data_o2 = process_outing_throttle(
+        outing2_files, "Outing 2", full_throttle_threshold=THROTTLE_THRESHOLD
+    )
 
-    laps_o1 = [item["lap_num"] for item in data_o1["laps"]]
-    laps_o2 = [item["lap_num"] for item in data_o2["laps"]]
-    format_x_ticks([ax], laps_o1, laps_o2)
+    if data_o1 and data_o2:
+        plot_throttle_comparison(data_o1, data_o2)
 
-    plt.tight_layout()
-    fig.canvas.manager.set_window_title("Coasting Analysis - Outing Comparison")
+
+if __name__ == "__main__":
+    files_1 = get_outing_files("Outing 1")
+    files_2 = get_outing_files("Outing 2")
+    if files_1 and files_2:
+        run_throttle_analysis(files_1, files_2)
+        plt.show()
