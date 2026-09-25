@@ -3,10 +3,8 @@ import tkinter as tk
 from tkinter import filedialog
 import matplotlib.pyplot as plt
 
-# Updated import path to data_processing package
 from my_tools.data_processing.telemetry_processor import process_outing_throttle
 
-# Path resolved relative to file location (goes UP two levels to reach root directory)
 DATA_FOLDER_PATH = os.path.abspath(
     os.path.join(os.path.dirname(__file__), "../../telemetry_data")
 )
@@ -23,7 +21,7 @@ def get_outing_files(outing_name):
 
     file_paths = filedialog.askopenfilenames(
         initialdir=DATA_FOLDER_PATH,
-        title=f"Select {outing_name} - MoTeC Telemetry Files (Hold Ctrl/Cmd for multiple)",
+        title=f"Select {outing_name} - MoTeC Telemetry Files",
         filetypes=[("MoTeC Log Files", "*.ld"), ("All Files", "*.*")],
     )
 
@@ -43,6 +41,7 @@ if not outing2_files:
     exit()
 
 # --- STEP 2: PROCESS TELEMETRY DATA VIA PROCESSOR ---
+# Telemetry processor now automatically sorts laps sequentially by lap_num internally
 data_outing1 = process_outing_throttle(
     outing1_files,
     "Outing 1",

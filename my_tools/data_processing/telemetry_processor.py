@@ -130,7 +130,6 @@ def process_outing_throttle(
         else:
             avg_throttle_speed = 0.0
 
-        # Run coasting detection using the processor-level threshold (150 km/h)
         coasting_events = detect_pre_braking_coasting(df, min_speed_kmh=150.0)
         total_coast_time = sum([e["duration"] for e in coasting_events])
 
@@ -161,6 +160,9 @@ def process_outing_throttle(
 
     if not lap_data:
         return None
+
+    # Internal sorting by lap number
+    lap_data.sort(key=lambda x: x["lap_num"])
 
     avg_pct = float(np.mean([item["pct"] for item in lap_data]))
     print(
@@ -225,7 +227,13 @@ def process_outing_brake_speed(
                     float(np.mean(active_application_rates))
                 )
 
-    return lap_numbers, avg_brake_speeds
+    # Internal sequential sorting
+    if lap_numbers:
+        lap_numbers, avg_brake_speeds = zip(
+            *sorted(zip(lap_numbers, avg_brake_speeds))
+        )
+
+    return list(lap_numbers), list(avg_brake_speeds)
 
 
 def process_outing_brake_release_speed(
@@ -273,7 +281,6 @@ def process_outing_brake_release_speed(
             brakes_smoothed = motec_smooth(brakes, num_samples=smooth_samples)
             brake_speed = compute_derivative(brakes_smoothed, dt)
 
-            # Release phase: derivative is negative (dBrake/dt < 0) AND absolute rate >= min_release_rate (10%/s)
             release_mask = (brake_speed < 0.0) & (
                 np.abs(brake_speed) >= min_release_rate
             )
@@ -285,7 +292,13 @@ def process_outing_brake_release_speed(
                     float(np.mean(active_release_rates))
                 )
 
-    return lap_numbers, avg_release_speeds
+    # Internal sequential sorting
+    if lap_numbers:
+        lap_numbers, avg_release_speeds = zip(
+            *sorted(zip(lap_numbers, avg_release_speeds))
+        )
+
+    return list(lap_numbers), list(avg_release_speeds)
 
 
 def process_outing_steering_speed(
@@ -299,7 +312,6 @@ def process_outing_steering_speed(
     lap_numbers = []
     avg_steering_speeds = []
 
-    # Common channel name aliases to check
     steer_aliases = [
         steering_channel.lower(),
         "steer",
@@ -325,7 +337,6 @@ def process_outing_steering_speed(
         if lap_num is None:
             lap_num = idx
 
-        # Flexible column matching
         steer_col = next(
             (c for c in df.columns if c.lower() in steer_aliases), None
         )
@@ -351,19 +362,12 @@ def process_outing_steering_speed(
             continue
 
         dt = np.diff(times, prepend=times[0])
-        # Replace zero dt values to prevent divide-by-zero infinite derivatives
         dt[dt <= 0] = 1e-4
 
-        # Smooth steering raw channel
         steer_smoothed = motec_smooth(steer_values, num_samples=smooth_samples)
-
-        # Compute raw derivative (dSteer/dt)
         raw_steer_speed = compute_derivative(steer_smoothed, dt)
-
-        # Convert to absolute steering rate (|dSteer/dt|)
         abs_steer_speed = np.abs(raw_steer_speed)
 
-        # Filter for active steering inputs exceeding noise threshold
         active_steering = abs_steer_speed[abs_steer_speed >= min_steering_rate]
 
         if len(active_steering) > 0:
@@ -375,7 +379,13 @@ def process_outing_steering_speed(
                 f"No points exceeded threshold {min_steering_rate}."
             )
 
-    return lap_numbers, avg_steering_speeds
+    # Internal sequential sorting
+    if lap_numbers:
+        lap_numbers, avg_steering_speeds = zip(
+            *sorted(zip(lap_numbers, avg_steering_speeds))
+        )
+
+    return list(lap_numbers), list(avg_steering_speeds)
 
 
 def process_outing_trajectory_curvature(
@@ -445,15 +455,11 @@ def process_outing_trajectory_curvature(
         if len(v_raw) < 2:
             continue
 
-        # Convert speed to m/s if logged in km/h
         v_ms = v_raw / 3.6 if np.max(v_raw) > 120.0 else v_raw
 
-        # Convert G_lat to m/s^2 if logged in g's (where 1g ≈ 9.81 m/s^2)
-        # If g_raw is already in m/s^2 (max > 3.0), keep as is
         is_in_g_units = np.max(np.abs(g_raw)) < 5.0
         g_ms2 = np.abs(g_raw) * 9.81 if is_in_g_units else np.abs(g_raw)
 
-        # Filter out straights, near-zero speeds, and parking/pit speeds
         v_kmh = v_ms * 3.6
         abs_g_units = np.abs(g_raw) if is_in_g_units else np.abs(g_raw) / 9.81
 
@@ -465,10 +471,15 @@ def process_outing_trajectory_curvature(
             v_corner = v_ms[cornering_mask]
             g_corner = g_ms2[cornering_mask]
 
-            # Curvature r = |a_lat| / V^2  (units: 1/m)
             curvature = g_corner / (v_corner**2)
 
             lap_numbers.append(lap_num)
             avg_curvatures.append(float(np.mean(curvature)))
 
-    return lap_numbers, avg_curvatures
+    # Internal sequential sorting
+    if lap_numbers:
+        lap_numbers, avg_curvatures = zip(
+            *sorted(zip(lap_numbers, avg_curvatures))
+        )
+
+    return list(lap_numbers), list(avg_curvatures)

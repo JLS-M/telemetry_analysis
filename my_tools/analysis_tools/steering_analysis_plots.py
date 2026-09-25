@@ -14,6 +14,7 @@ DATA_FOLDER_PATH = os.path.abspath(
 
 
 def get_outing_files(outing_name):
+    """Opens a file dialog to select files for a specific outing."""
     root = tk.Tk()
     root.withdraw()
     root.attributes("-topmost", True)
@@ -42,7 +43,7 @@ if not outing2_files:
 # --- STEP 2: PROCESS STEERING SPEED & CURVATURE DATA ---
 MIN_STEER_THRESHOLD = 10.0  # deg/s
 
-# 1. Steering Speed
+# 1. Steering Speed (Telemetry processor handles internal sequential sorting)
 laps_steer_o1, steer_speed_o1 = process_outing_steering_speed(
     outing1_files, min_steering_rate=MIN_STEER_THRESHOLD, smooth_samples=9
 )
@@ -57,22 +58,6 @@ laps_curv_o1, curvature_o1 = process_outing_trajectory_curvature(
 laps_curv_o2, curvature_o2 = process_outing_trajectory_curvature(
     outing2_files, min_lat_acc_g=0.2, min_speed_kmh=30.0
 )
-
-# Sort steering speed data sequentially
-if laps_steer_o1:
-    laps_steer_o1, steer_speed_o1 = zip(
-        *sorted(zip(laps_steer_o1, steer_speed_o1))
-    )
-if laps_steer_o2:
-    laps_steer_o2, steer_speed_o2 = zip(
-        *sorted(zip(laps_steer_o2, steer_speed_o2))
-    )
-
-# Sort curvature data sequentially
-if laps_curv_o1:
-    laps_curv_o1, curvature_o1 = zip(*sorted(zip(laps_curv_o1, curvature_o1)))
-if laps_curv_o2:
-    laps_curv_o2, curvature_o2 = zip(*sorted(zip(laps_curv_o2, curvature_o2)))
 
 # --- STEP 3: RENDER PLOTS SIDE BY SIDE ---
 colors = {"Outing 1": "#1f77b4", "Outing 2": "#ff7f0e"}
