@@ -24,7 +24,6 @@ def detect_pre_braking_coasting(
     if len(throttle) < 2 or len(brake) < 2 or len(speed) < 2:
         return []
 
-    # Safe unit conversion: ACC outputs speed in m/s
     speed_kmh = speed * 3.6 if np.max(speed) < 120.0 else speed
 
     is_coasting = (throttle < pedal_threshold) & (brake < pedal_threshold)
@@ -161,9 +160,7 @@ def process_outing_throttle(
     if not lap_data:
         return None
 
-    # Internal sorting by lap number
     lap_data.sort(key=lambda x: x["lap_num"])
-
     avg_pct = float(np.mean([item["pct"] for item in lap_data]))
     print(
         f"--> {outing_name} Average Full Throttle (>={full_throttle_threshold:.0f}%): {avg_pct:.2f}%"
@@ -172,80 +169,17 @@ def process_outing_throttle(
     return {"avg_pct": avg_pct, "laps": lap_data}
 
 
-def process_outing_brake_speed(
+def process_outing_brake_dynamics(
     file_paths,
     min_brake_rate=80.0,
-    smooth_samples=9,
-    brake_channel="Brake",
-    time_channel="Brake_Time",
-):
-    """Calculates average brake application speed (%/s) per lap for rates >= min_brake_rate."""
-    lap_numbers = []
-    avg_brake_speeds = []
-
-    for idx, path in enumerate(file_paths, start=1):
-        filename = os.path.basename(path)
-        df = load_acc_telemetry(path)
-
-        lap_num = extract_lap_number(filename)
-        if lap_num is None:
-            lap_num = idx
-
-        brake_col = next(
-            (c for c in df.columns if c.lower() == brake_channel.lower()), None
-        )
-        time_col = next(
-            (
-                c
-                for c in df.columns
-                if c.lower() in [time_channel.lower(), "speed_time", "time"]
-            ),
-            None,
-        )
-
-        if brake_col and time_col:
-            clean_df = df[[brake_col, time_col]].dropna().reset_index(drop=True)
-
-            brakes = clean_df[brake_col].values
-            times = clean_df[time_col].values
-
-            if len(brakes) < 2:
-                continue
-
-            dt = np.diff(times, prepend=times[0])
-
-            brakes_smoothed = motec_smooth(brakes, num_samples=smooth_samples)
-            brake_speed = compute_derivative(brakes_smoothed, dt)
-
-            active_application_rates = brake_speed[
-                brake_speed >= min_brake_rate
-            ]
-
-            if len(active_application_rates) > 0:
-                lap_numbers.append(lap_num)
-                avg_brake_speeds.append(
-                    float(np.mean(active_application_rates))
-                )
-
-    # Internal sequential sorting
-    if lap_numbers:
-        lap_numbers, avg_brake_speeds = zip(
-            *sorted(zip(lap_numbers, avg_brake_speeds))
-        )
-
-    return list(lap_numbers), list(avg_brake_speeds)
-
-
-def process_outing_brake_release_speed(
-    file_paths,
     min_release_rate=10.0,
     smooth_samples=9,
     brake_channel="Brake",
     time_channel="Brake_Time",
 ):
-    """Calculates average brake release speed (%/s) per lap for release rates >= 10%/s (when dBrake/dt < 0)."""
-    lap_numbers = []
-    avg_release_speeds = []
+    """Processes telemetry files in a SINGLE PASS to compute both brake application speed and release speed per lap."""
+    laps_app, avg_app_speeds = [], []
+    laps_rel, avg_rel_speeds = [], []
 
     for idx, path in enumerate(file_paths, start=1):
         filename = os.path.basename(path)
@@ -269,7 +203,6 @@ def process_outing_brake_release_speed(
 
         if brake_col and time_col:
             clean_df = df[[brake_col, time_col]].dropna().reset_index(drop=True)
-
             brakes = clean_df[brake_col].values
             times = clean_df[time_col].values
 
@@ -277,152 +210,52 @@ def process_outing_brake_release_speed(
                 continue
 
             dt = np.diff(times, prepend=times[0])
-
             brakes_smoothed = motec_smooth(brakes, num_samples=smooth_samples)
             brake_speed = compute_derivative(brakes_smoothed, dt)
 
+            # Application Speed (Entry)
+            active_app_rates = brake_speed[brake_speed >= min_brake_rate]
+            if len(active_app_rates) > 0:
+                laps_app.append(lap_num)
+                avg_app_speeds.append(float(np.mean(active_app_rates)))
+
+            # Release Speed (Trail-braking)
             release_mask = (brake_speed < 0.0) & (
                 np.abs(brake_speed) >= min_release_rate
             )
-            active_release_rates = np.abs(brake_speed[release_mask])
+            active_rel_rates = np.abs(brake_speed[release_mask])
+            if len(active_rel_rates) > 0:
+                laps_rel.append(lap_num)
+                avg_rel_speeds.append(float(np.mean(active_rel_rates)))
 
-            if len(active_release_rates) > 0:
-                lap_numbers.append(lap_num)
-                avg_release_speeds.append(
-                    float(np.mean(active_release_rates))
-                )
+    # Sort deterministically
+    if laps_app:
+        laps_app, avg_app_speeds = zip(*sorted(zip(laps_app, avg_app_speeds)))
+    if laps_rel:
+        laps_rel, avg_rel_speeds = zip(*sorted(zip(laps_rel, avg_rel_speeds)))
 
-    # Internal sequential sorting
-    if lap_numbers:
-        lap_numbers, avg_release_speeds = zip(
-            *sorted(zip(lap_numbers, avg_release_speeds))
-        )
+    return (
+        list(laps_app),
+        list(avg_app_speeds),
+        list(laps_rel),
+        list(avg_rel_speeds),
+    )
 
-    return list(lap_numbers), list(avg_release_speeds)
 
-
-def process_outing_steering_speed(
+def process_outing_steering_and_curvature(
     file_paths,
     min_steering_rate=10.0,
-    smooth_samples=9,
-    steering_channel="Steering",
-    time_channel="Steering_Time",
-):
-    """Calculates average absolute steering speed (deg/s or %/s) per lap for steering rates >= min_steering_rate."""
-    lap_numbers = []
-    avg_steering_speeds = []
-
-    steer_aliases = [
-        steering_channel.lower(),
-        "steer",
-        "steering angle",
-        "steerangle",
-        "steering_angle",
-        "steer_angle",
-    ]
-    time_aliases = [
-        time_channel.lower(),
-        "steering_time",
-        "steer_time",
-        "speed_time",
-        "time",
-        "throttle_time",
-    ]
-
-    for idx, path in enumerate(file_paths, start=1):
-        filename = os.path.basename(path)
-        df = load_acc_telemetry(path)
-
-        lap_num = extract_lap_number(filename)
-        if lap_num is None:
-            lap_num = idx
-
-        steer_col = next(
-            (c for c in df.columns if c.lower() in steer_aliases), None
-        )
-        time_col = next(
-            (c for c in df.columns if c.lower() in time_aliases), None
-        )
-
-        if not steer_col or not time_col:
-            print(
-                f"[Debug] Skipping '{filename}': Could not find matching steering or time channel."
-            )
-            print(f"        Available channels: {list(df.columns)}")
-            continue
-
-        clean_df = df[[steer_col, time_col]].dropna().reset_index(drop=True)
-        steer_values = clean_df[steer_col].values
-        times = clean_df[time_col].values
-
-        if len(steer_values) < 2:
-            print(
-                f"[Debug] Skipping '{filename}': Insufficient data points in steering column."
-            )
-            continue
-
-        dt = np.diff(times, prepend=times[0])
-        dt[dt <= 0] = 1e-4
-
-        steer_smoothed = motec_smooth(steer_values, num_samples=smooth_samples)
-        raw_steer_speed = compute_derivative(steer_smoothed, dt)
-        abs_steer_speed = np.abs(raw_steer_speed)
-
-        active_steering = abs_steer_speed[abs_steer_speed >= min_steering_rate]
-
-        if len(active_steering) > 0:
-            lap_numbers.append(lap_num)
-            avg_steering_speeds.append(float(np.mean(active_steering)))
-        else:
-            print(
-                f"[Debug] '{filename}' (Lap {lap_num}): Max absolute steering speed was {np.max(abs_steer_speed):.2f}. "
-                f"No points exceeded threshold {min_steering_rate}."
-            )
-
-    # Internal sequential sorting
-    if lap_numbers:
-        lap_numbers, avg_steering_speeds = zip(
-            *sorted(zip(lap_numbers, avg_steering_speeds))
-        )
-
-    return list(lap_numbers), list(avg_steering_speeds)
-
-
-def process_outing_trajectory_curvature(
-    file_paths,
     min_lat_acc_g=0.2,
     min_speed_kmh=30.0,
-    speed_channel="Speed",
-    lat_acc_channel="G_Lat",
-    time_channel="Speed_Time",
+    smooth_samples=9,
 ):
-    """Calculates average trajectory curvature r = |G_lat| / V^2 (1/m) per lap for cornering phases (|G_lat| >= min_lat_acc_g and V >= min_speed_kmh)."""
-    lap_numbers = []
-    avg_curvatures = []
+    """Processes telemetry files in a SINGLE PASS to extract steering speed and trajectory curvature metrics."""
+    laps_steer, avg_steer_speeds = [], []
+    laps_curv, avg_curvatures = [], []
 
-    speed_aliases = [
-        speed_channel.lower(),
-        "v",
-        "speed",
-        "vehicle_speed",
-        "car_speed",
-    ]
-    lat_acc_aliases = [
-        lat_acc_channel.lower(),
-        "g_lat",
-        "lat_g",
-        "acc_lat",
-        "lat_acc",
-        "g_lateral",
-        "lateral_acc",
-    ]
-    time_aliases = [
-        time_channel.lower(),
-        "speed_time",
-        "time",
-        "throttle_time",
-        "steering_time",
-    ]
+    steer_aliases = ["steering", "steer", "steerangle", "steering angle", "steer_angle", "steering_angle"]
+    speed_aliases = ["speed", "v", "vehicle_speed", "car_speed"]
+    lat_acc_aliases = ["g_lat", "lat_g", "acc_lat", "lat_acc", "g_lateral", "lateral_acc"]
 
     for idx, path in enumerate(file_paths, start=1):
         filename = os.path.basename(path)
@@ -432,54 +265,89 @@ def process_outing_trajectory_curvature(
         if lap_num is None:
             lap_num = idx
 
+        steer_col = next((c for c in df.columns if c.lower() in steer_aliases), None)
         v_col = next((c for c in df.columns if c.lower() in speed_aliases), None)
-        g_col = next(
-            (c for c in df.columns if c.lower() in lat_acc_aliases), None
-        )
-        time_col = next(
-            (c for c in df.columns if c.lower() in time_aliases), None
-        )
+        g_col = next((c for c in df.columns if c.lower() in lat_acc_aliases), None)
 
-        if not v_col or not g_col:
-            print(
-                f"[Debug] Skipping '{filename}': Missing Speed or G_Lat channel."
-            )
-            continue
+        # 1. Process Steering Speed
+        time_col = "Steer_Angle_Time" if "Steer_Angle_Time" in df else "Speed_Time"
+        if steer_col and time_col in df:
+            clean_steer = df[[steer_col, time_col]].dropna().reset_index(drop=True)
+            steer_val = clean_steer[steer_col].values
+            steer_time = clean_steer[time_col].values
 
-        cols_to_use = [v_col, g_col] + ([time_col] if time_col else [])
-        clean_df = df[cols_to_use].dropna().reset_index(drop=True)
+            if len(steer_val) >= 2:
+                dt = np.diff(steer_time, prepend=steer_time[0])
+                dt[dt <= 0] = 1e-4
+                steer_smoothed = motec_smooth(steer_val, num_samples=smooth_samples)
+                abs_steer_speed = np.abs(compute_derivative(steer_smoothed, dt))
+                active_steer = abs_steer_speed[abs_steer_speed >= min_steering_rate]
 
-        v_raw = clean_df[v_col].values
-        g_raw = clean_df[g_col].values
+                if len(active_steer) > 0:
+                    laps_steer.append(lap_num)
+                    avg_steer_speeds.append(float(np.mean(active_steer)))
 
-        if len(v_raw) < 2:
-            continue
+        # 2. Process Trajectory Curvature
+        if v_col and g_col:
+            clean_curv = df[[v_col, g_col]].dropna().reset_index(drop=True)
+            v_raw = clean_curv[v_col].values
+            g_raw = clean_curv[g_col].values
 
-        v_ms = v_raw / 3.6 if np.max(v_raw) > 120.0 else v_raw
+            if len(v_raw) >= 2:
+                v_ms = v_raw / 3.6 if np.max(v_raw) > 120.0 else v_raw
+                is_in_g_units = np.max(np.abs(g_raw)) < 5.0
+                g_ms2 = np.abs(g_raw) * 9.81 if is_in_g_units else np.abs(g_raw)
+                v_kmh = v_ms * 3.6
+                abs_g_units = np.abs(g_raw) if is_in_g_units else np.abs(g_raw) / 9.81
 
-        is_in_g_units = np.max(np.abs(g_raw)) < 5.0
-        g_ms2 = np.abs(g_raw) * 9.81 if is_in_g_units else np.abs(g_raw)
+                cornering_mask = (abs_g_units >= min_lat_acc_g) & (v_kmh >= min_speed_kmh)
 
-        v_kmh = v_ms * 3.6
-        abs_g_units = np.abs(g_raw) if is_in_g_units else np.abs(g_raw) / 9.81
+                if np.any(cornering_mask):
+                    v_corner = v_ms[cornering_mask]
+                    g_corner = g_ms2[cornering_mask]
+                    curvature = g_corner / (v_corner**2)
 
-        cornering_mask = (abs_g_units >= min_lat_acc_g) & (
-            v_kmh >= min_speed_kmh
-        )
+                    laps_curv.append(lap_num)
+                    avg_curvatures.append(float(np.mean(curvature)))
 
-        if np.any(cornering_mask):
-            v_corner = v_ms[cornering_mask]
-            g_corner = g_ms2[cornering_mask]
+    # Sort deterministically
+    if laps_steer:
+        laps_steer, avg_steer_speeds = zip(*sorted(zip(laps_steer, avg_steer_speeds)))
+    if laps_curv:
+        laps_curv, avg_curvatures = zip(*sorted(zip(laps_curv, avg_curvatures)))
 
-            curvature = g_corner / (v_corner**2)
+    return (
+        list(laps_steer),
+        list(avg_steer_speeds),
+        list(laps_curv),
+        list(avg_curvatures),
+    )
 
-            lap_numbers.append(lap_num)
-            avg_curvatures.append(float(np.mean(curvature)))
 
-    # Internal sequential sorting
-    if lap_numbers:
-        lap_numbers, avg_curvatures = zip(
-            *sorted(zip(lap_numbers, avg_curvatures))
-        )
+# --- LEGACY WRAPPERS FOR BACKWARD COMPATIBILITY ---
+def process_outing_brake_speed(file_paths, min_brake_rate=80.0, smooth_samples=9, **kwargs):
+    laps_app, app_speeds, _, _ = process_outing_brake_dynamics(
+        file_paths, min_brake_rate=min_brake_rate, smooth_samples=smooth_samples
+    )
+    return laps_app, app_speeds
 
-    return list(lap_numbers), list(avg_curvatures)
+
+def process_outing_brake_release_speed(file_paths, min_release_rate=10.0, smooth_samples=9, **kwargs):
+    _, _, laps_rel, rel_speeds = process_outing_brake_dynamics(
+        file_paths, min_release_rate=min_release_rate, smooth_samples=smooth_samples
+    )
+    return laps_rel, rel_speeds
+
+
+def process_outing_steering_speed(file_paths, min_steering_rate=10.0, smooth_samples=9, **kwargs):
+    laps_steer, steer_speeds, _, _ = process_outing_steering_and_curvature(
+        file_paths, min_steering_rate=min_steering_rate, smooth_samples=smooth_samples
+    )
+    return laps_steer, steer_speeds
+
+
+def process_outing_trajectory_curvature(file_paths, min_lat_acc_g=0.2, min_speed_kmh=30.0, **kwargs):
+    _, _, laps_curv, curvatures = process_outing_steering_and_curvature(
+        file_paths, min_lat_acc_g=min_lat_acc_g, min_speed_kmh=min_speed_kmh
+    )
+    return laps_curv, curvatures
