@@ -69,8 +69,8 @@ def run_steering_analysis(outing1_files, outing2_files):
         )
     ax1.set_xticks([0, 1])
     ax1.set_xticklabels(["Outing 1", "Outing 2"])
-    ax1.set_title("Average Absolute Steering Speed", fontsize=11, pad=12)
-    ax1.set_ylabel("Steering Speed (deg/s)", fontsize=10)
+    ax1.set_title("Average Absolute Steering Rate", fontsize=11, pad=12)
+    ax1.set_ylabel("Steering Rate (deg/s)", fontsize=10)
     apply_shared_y_limits(ax1, [avg_steer_o1], [avg_steer_o2])
     ax1.grid(axis="y", linestyle="--", alpha=0.6)
 
@@ -96,12 +96,12 @@ def run_steering_analysis(outing1_files, outing2_files):
     max_steer = max(all_steer) if all_steer else 70.0
     ax2.set_ylim(bottom=20, top=max_steer * 1.3)
     ax2.set_title(
-        f"Average Absolute Steering Speed per Lap (≥{MIN_STEER_THRESHOLD:.0f} deg/s)",
+        f"Average Absolute Steering Rate per Lap (≥{MIN_STEER_THRESHOLD:.0f} deg/s)",
         fontsize=11,
         pad=12,
     )
     ax2.set_xlabel("Lap Number", fontsize=10)
-    ax2.set_ylabel("Steering Speed (deg/s)", fontsize=10)
+    ax2.set_ylabel("Steering Rate (deg/s)", fontsize=10)
     ax2.grid(True, linestyle="--", alpha=0.6)
     ax2.legend(loc="best", fontsize=10)
 
