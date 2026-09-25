@@ -286,3 +286,189 @@ def process_outing_brake_release_speed(
                 )
 
     return lap_numbers, avg_release_speeds
+
+
+def process_outing_steering_speed(
+    file_paths,
+    min_steering_rate=10.0,
+    smooth_samples=9,
+    steering_channel="Steering",
+    time_channel="Steering_Time",
+):
+    """Calculates average absolute steering speed (deg/s or %/s) per lap for steering rates >= min_steering_rate."""
+    lap_numbers = []
+    avg_steering_speeds = []
+
+    # Common channel name aliases to check
+    steer_aliases = [
+        steering_channel.lower(),
+        "steer",
+        "steering angle",
+        "steerangle",
+        "steering_angle",
+        "steer_angle",
+    ]
+    time_aliases = [
+        time_channel.lower(),
+        "steering_time",
+        "steer_time",
+        "speed_time",
+        "time",
+        "throttle_time",
+    ]
+
+    for idx, path in enumerate(file_paths, start=1):
+        filename = os.path.basename(path)
+        df = load_acc_telemetry(path)
+
+        lap_num = extract_lap_number(filename)
+        if lap_num is None:
+            lap_num = idx
+
+        # Flexible column matching
+        steer_col = next(
+            (c for c in df.columns if c.lower() in steer_aliases), None
+        )
+        time_col = next(
+            (c for c in df.columns if c.lower() in time_aliases), None
+        )
+
+        if not steer_col or not time_col:
+            print(
+                f"[Debug] Skipping '{filename}': Could not find matching steering or time channel."
+            )
+            print(f"        Available channels: {list(df.columns)}")
+            continue
+
+        clean_df = df[[steer_col, time_col]].dropna().reset_index(drop=True)
+        steer_values = clean_df[steer_col].values
+        times = clean_df[time_col].values
+
+        if len(steer_values) < 2:
+            print(
+                f"[Debug] Skipping '{filename}': Insufficient data points in steering column."
+            )
+            continue
+
+        dt = np.diff(times, prepend=times[0])
+        # Replace zero dt values to prevent divide-by-zero infinite derivatives
+        dt[dt <= 0] = 1e-4
+
+        # Smooth steering raw channel
+        steer_smoothed = motec_smooth(steer_values, num_samples=smooth_samples)
+
+        # Compute raw derivative (dSteer/dt)
+        raw_steer_speed = compute_derivative(steer_smoothed, dt)
+
+        # Convert to absolute steering rate (|dSteer/dt|)
+        abs_steer_speed = np.abs(raw_steer_speed)
+
+        # Filter for active steering inputs exceeding noise threshold
+        active_steering = abs_steer_speed[abs_steer_speed >= min_steering_rate]
+
+        if len(active_steering) > 0:
+            lap_numbers.append(lap_num)
+            avg_steering_speeds.append(float(np.mean(active_steering)))
+        else:
+            print(
+                f"[Debug] '{filename}' (Lap {lap_num}): Max absolute steering speed was {np.max(abs_steer_speed):.2f}. "
+                f"No points exceeded threshold {min_steering_rate}."
+            )
+
+    return lap_numbers, avg_steering_speeds
+
+
+def process_outing_trajectory_curvature(
+    file_paths,
+    min_lat_acc_g=0.2,
+    min_speed_kmh=30.0,
+    speed_channel="Speed",
+    lat_acc_channel="G_Lat",
+    time_channel="Speed_Time",
+):
+    """Calculates average trajectory curvature r = |G_lat| / V^2 (1/m) per lap for cornering phases (|G_lat| >= min_lat_acc_g and V >= min_speed_kmh)."""
+    lap_numbers = []
+    avg_curvatures = []
+
+    speed_aliases = [
+        speed_channel.lower(),
+        "v",
+        "speed",
+        "vehicle_speed",
+        "car_speed",
+    ]
+    lat_acc_aliases = [
+        lat_acc_channel.lower(),
+        "g_lat",
+        "lat_g",
+        "acc_lat",
+        "lat_acc",
+        "g_lateral",
+        "lateral_acc",
+    ]
+    time_aliases = [
+        time_channel.lower(),
+        "speed_time",
+        "time",
+        "throttle_time",
+        "steering_time",
+    ]
+
+    for idx, path in enumerate(file_paths, start=1):
+        filename = os.path.basename(path)
+        df = load_acc_telemetry(path)
+
+        lap_num = extract_lap_number(filename)
+        if lap_num is None:
+            lap_num = idx
+
+        v_col = next((c for c in df.columns if c.lower() in speed_aliases), None)
+        g_col = next(
+            (c for c in df.columns if c.lower() in lat_acc_aliases), None
+        )
+        time_col = next(
+            (c for c in df.columns if c.lower() in time_aliases), None
+        )
+
+        if not v_col or not g_col:
+            print(
+                f"[Debug] Skipping '{filename}': Missing Speed or G_Lat channel."
+            )
+            continue
+
+        cols_to_use = [v_col, g_col] + ([time_col] if time_col else [])
+        clean_df = df[cols_to_use].dropna().reset_index(drop=True)
+
+        v_raw = clean_df[v_col].values
+        g_raw = clean_df[g_col].values
+
+        if len(v_raw) < 2:
+            continue
+
+        # Convert speed to m/s if logged in km/h
+        v_ms = v_raw / 3.6 if np.max(v_raw) > 120.0 else v_raw
+
+        # Convert G_lat to m/s^2 if logged in g's (where 1g ≈ 9.81 m/s^2)
+        # If g_raw is already in m/s^2 (max > 3.0), keep as is
+        is_in_g_units = np.max(np.abs(g_raw)) < 5.0
+        g_ms2 = np.abs(g_raw) * 9.81 if is_in_g_units else np.abs(g_raw)
+
+        # Filter out straights, near-zero speeds, and parking/pit speeds
+        v_kmh = v_ms * 3.6
+        abs_g_units = np.abs(g_raw) if is_in_g_units else np.abs(g_raw) / 9.81
+
+        cornering_mask = (abs_g_units >= min_lat_acc_g) & (
+            v_kmh >= min_speed_kmh
+        )
+
+        if np.any(cornering_mask):
+            v_corner = v_ms[cornering_mask]
+            g_corner = g_ms2[cornering_mask]
+
+            # Curvature r = |a_lat| / V^2  (units: 1/m)
+            curvature = g_corner / (v_corner**2)
+
+            lap_numbers.append(lap_num)
+            avg_curvatures.append(float(np.mean(curvature)))
+
+    return lap_numbers, avg_curvatures
