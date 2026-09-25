@@ -95,7 +95,7 @@ def run_brake_analysis(outing1_files, outing2_files):
 
     all_app = list(brake_app_speed_o1 or ()) + list(brake_app_speed_o2 or ())
     max_app = max(all_app) if all_app else 200.0
-    ax2.set_ylim(bottom=0, top=max_app * 1.3)
+    ax2.set_ylim(bottom=80, top=max_app * 1.3)
     ax2.set_title("Brake Application Speed per Lap (>80%/s)", fontsize=11, pad=12)
     ax2.set_xlabel("Lap Number", fontsize=10)
     ax2.set_ylabel("Application Speed (%/s)", fontsize=10)
