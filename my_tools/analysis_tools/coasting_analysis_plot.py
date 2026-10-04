@@ -2,6 +2,7 @@ import matplotlib.pyplot as plt
 from my_tools.data_processing.signal_utils import (
     apply_shared_y_limits,
     get_outing_files,
+    remap_outing_laps,  # Import the remapping helper from signal_utils
 )
 from my_tools.data_processing.telemetry_processor import process_outing_throttle
 
@@ -29,16 +30,17 @@ def run_coasting_analysis(outing1_files, outing2_files):
     if not data_o1 or not data_o2:
         return
 
-    outings_data = [("Outing 1", data_o1), ("Outing 2", data_o2)]
+    # Use remap_outing_laps to get chronologically sorted laps and correct numbering mode x-values
+    laps_o1, laps_o2, sorted_laps_1, sorted_laps_2 = remap_outing_laps(data_o1, data_o2)
 
-    # Compute lap percentages and session averages
+    # Compute lap percentages from the sorted laps
     pcts_o1 = [
         (
             (item["total_coasting_time"] / item["total_lap_time"] * 100.0)
             if item.get("total_lap_time", 0) > 0
             else 0.0
         )
-        for item in data_o1["laps"]
+        for item in sorted_laps_1
     ]
     pcts_o2 = [
         (
@@ -46,21 +48,13 @@ def run_coasting_analysis(outing1_files, outing2_files):
             if item.get("total_lap_time", 0) > 0
             else 0.0
         )
-        for item in data_o2["laps"]
+        for item in sorted_laps_2
     ]
 
     avg_pct_o1 = sum(pcts_o1) / len(pcts_o1) if pcts_o1 else 0.0
     avg_pct_o2 = sum(pcts_o2) / len(pcts_o2) if pcts_o2 else 0.0
 
     all_lap_pcts = pcts_o1 + pcts_o2
-    min_lap = min(
-        [item["lap_num"] for name, data in outings_data for item in data["laps"]]
-        or [1]
-    )
-    max_lap = max(
-        [item["lap_num"] for name, data in outings_data for item in data["laps"]]
-        or [1]
-    )
 
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 5))
 
@@ -91,20 +85,22 @@ def run_coasting_analysis(outing1_files, outing2_files):
     ax1.grid(axis="y", linestyle="--", alpha=0.6)
 
     # --- Panel 2: Lap-by-Lap Scatter Plot ---
-    for name, data in outings_data:
-        x_laps = [item["lap_num"] for item in data["laps"]]
-        y_coasting_pct = (
-            pcts_o1 if name == "Outing 1" else pcts_o2
-        )
-
-        ax2.scatter(
-            x_laps,
-            y_coasting_pct,
-            color=COLORS[name],
-            label=name,
-            zorder=3,
-            **SCATTER_STYLE,
-        )
+    ax2.scatter(
+        laps_o1,
+        pcts_o1,
+        color=COLORS["Outing 1"],
+        label="Outing 1",
+        zorder=3,
+        **SCATTER_STYLE,
+    )
+    ax2.scatter(
+        laps_o2,
+        pcts_o2,
+        color=COLORS["Outing 2"],
+        label="Outing 2",
+        zorder=3,
+        **SCATTER_STYLE,
+    )
 
     max_pct = max(all_lap_pcts) if all_lap_pcts else 10.0
     ax2.set_ylim(bottom=0, top=max_pct * 1.3)
@@ -114,9 +110,14 @@ def run_coasting_analysis(outing1_files, outing2_files):
         fontsize=11,
         pad=12,
     )
-    ax2.set_xlabel("Lap Number", fontsize=10)
+    ax2.set_xlabel("Lap", fontsize=10)
     ax2.set_ylabel("Coasting Time (% of Lap Time)", fontsize=10)
-    ax2.set_xticks(range(min_lap, max_lap + 1))
+
+    # Shared X-ticks formatting based on the remapped lap values
+    all_laps = sorted(list(set(laps_o1 + laps_o2)))
+    if all_laps:
+        ax2.set_xticks(range(min(all_laps), max(all_laps) + 1))
+
     ax2.grid(True, linestyle="--", alpha=0.6)
     ax2.legend(loc="best", fontsize=10)
 

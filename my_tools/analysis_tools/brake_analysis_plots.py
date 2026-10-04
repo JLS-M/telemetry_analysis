@@ -2,6 +2,7 @@ import matplotlib.pyplot as plt
 from my_tools.data_processing.signal_utils import (
     apply_shared_y_limits,
     get_outing_files,
+    remap_lap_lists,
 )
 from my_tools.data_processing.telemetry_processor import (
     process_outing_brake_dynamics,
@@ -22,6 +23,16 @@ def run_brake_analysis(outing1_files, outing2_files):
         process_outing_brake_dynamics(
             outing2_files, min_brake_rate=80.0, min_release_rate=10.0
         )
+    )
+
+    # Remap lap numbers globally based on configuration switch
+    (
+        laps_app_o1,
+        laps_rel_o1,
+        laps_app_o2,
+        laps_rel_o2,
+    ) = remap_lap_lists(
+        laps_app_o1, laps_rel_o1, laps_app_o2, laps_rel_o2
     )
 
     # Compute outing averages
@@ -97,7 +108,7 @@ def run_brake_analysis(outing1_files, outing2_files):
     max_app = max(all_app) if all_app else 200.0
     ax2.set_ylim(bottom=80, top=max_app * 1.3)
     ax2.set_title("Brake Application Speed per Lap (>80%/s)", fontsize=11, pad=12)
-    ax2.set_xlabel("Lap Number", fontsize=10)
+    ax2.set_xlabel("Lap", fontsize=10)
     ax2.set_ylabel("Application Speed (%/s)", fontsize=10)
     ax2.grid(True, linestyle="--", alpha=0.6)
     ax2.legend(loc="best", fontsize=10)
@@ -151,7 +162,7 @@ def run_brake_analysis(outing1_files, outing2_files):
     max_rel = max(all_rel) if all_rel else 200.0
     ax4.set_ylim(bottom=0, top=max_rel * 1.3)
     ax4.set_title("Brake Release Speed per Lap (<10%/s)", fontsize=11, pad=12)
-    ax4.set_xlabel("Lap Number", fontsize=10)
+    ax4.set_xlabel("Lap", fontsize=10)
     ax4.set_ylabel("Release Speed (%/s)", fontsize=10)
     ax4.grid(True, linestyle="--", alpha=0.6)
     ax4.legend(loc="best", fontsize=10)

@@ -246,8 +246,8 @@ for name, data in outings_data:
         zorder=3,
     )
 
-ax2.set_title("Full Throttle % per Lap\nby Lap Number", fontsize=11, pad=15)
-ax2.set_xlabel("Lap Number", fontsize=10)
+ax2.set_title("Full Throttle % per Lap\nby Lap", fontsize=11, pad=15)
+ax2.set_xlabel("Lap", fontsize=10)
 ax2.set_ylabel("Full Throttle Percentage (%)", fontsize=10)
 ax2.set_ylim(0, 100)
 ax2.set_xticks(range(min_lap, max_lap + 1))
@@ -273,11 +273,11 @@ for name, data in outings_data:
     )
 
 ax3.set_title(
-    f"Avg Throttle Speed per Lap (MoTeC Smooth {SMOOTH_SAMPLES}smp)\nby Lap Number",
+    f"Avg Throttle Speed per Lap (MoTeC Smooth {SMOOTH_SAMPLES}smp)\nby Lap",
     fontsize=11,
     pad=15,
 )
-ax3.set_xlabel("Lap Number", fontsize=10)
+ax3.set_xlabel("Lap", fontsize=10)
 ax3.set_ylabel("Throttle Speed (% / s)", fontsize=10)
 
 # Scaled Y-axis bounds from 20 to 90 %/s

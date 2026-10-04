@@ -2,6 +2,7 @@ import matplotlib.pyplot as plt
 from my_tools.data_processing.signal_utils import (
     apply_shared_y_limits,
     get_outing_files,
+    remap_lap_lists,
 )
 from my_tools.data_processing.telemetry_processor import (
     process_outing_steering_and_curvature,
@@ -29,6 +30,16 @@ def run_steering_analysis(outing1_files, outing2_files):
             min_lat_acc_g=0.2,
             min_speed_kmh=30.0,
         )
+    )
+
+    # Remap lap numbers globally based on config (sequential vs straight)
+    (
+        laps_steer_o1,
+        laps_curv_o1,
+        laps_steer_o2,
+        laps_curv_o2,
+    ) = remap_lap_lists(
+        laps_steer_o1, laps_curv_o1, laps_steer_o2, laps_curv_o2
     )
 
     # Compute outing averages
@@ -100,7 +111,7 @@ def run_steering_analysis(outing1_files, outing2_files):
         fontsize=11,
         pad=12,
     )
-    ax2.set_xlabel("Lap Number", fontsize=10)
+    ax2.set_xlabel("Lap", fontsize=10)
     ax2.set_ylabel("Steering Rate (deg/s)", fontsize=10)
     ax2.grid(True, linestyle="--", alpha=0.6)
     ax2.legend(loc="best", fontsize=10)
@@ -159,7 +170,7 @@ def run_steering_analysis(outing1_files, outing2_files):
         fontsize=11,
         pad=12,
     )
-    ax4.set_xlabel("Lap Number", fontsize=10)
+    ax4.set_xlabel("Lap", fontsize=10)
     ax4.set_ylabel("Curvature r (1/m)", fontsize=10)
     ax4.grid(True, linestyle="--", alpha=0.6)
     ax4.legend(loc="best", fontsize=10)

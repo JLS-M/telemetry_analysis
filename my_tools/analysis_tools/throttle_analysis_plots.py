@@ -2,6 +2,7 @@ import matplotlib.pyplot as plt
 from my_tools.data_processing.signal_utils import (
     apply_shared_y_limits,
     get_outing_files,
+    remap_outing_laps,  # 1. Import the remapping helper
 )
 from my_tools.data_processing.telemetry_processor import process_outing_throttle
 
@@ -13,12 +14,14 @@ SCATTER_STYLE = {"s": 70, "alpha": 0.85, "edgecolor": "black", "linewidth": 0.8}
 def plot_throttle_comparison(data_o1, data_o2):
     """Renders 4-panel layout for full-throttle percentage and application speed (averages + scatters)."""
     fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(16, 10))
-    outings = [("Outing 1", data_o1), ("Outing 2", data_o2)]
 
-    pcts_o1 = [item["pct"] for item in data_o1["laps"]]
-    pcts_o2 = [item["pct"] for item in data_o2["laps"]]
-    speeds_o1 = [item["avg_throttle_speed"] for item in data_o1["laps"]]
-    speeds_o2 = [item["avg_throttle_speed"] for item in data_o2["laps"]]
+    # 2. Get chronologically sorted data and remapped x-values (handles straight vs sequential automatically)
+    laps_o1, laps_o2, sorted_laps_1, sorted_laps_2 = remap_outing_laps(data_o1, data_o2)
+
+    pcts_o1 = [item["pct"] for item in sorted_laps_1]
+    pcts_o2 = [item["pct"] for item in sorted_laps_2]
+    speeds_o1 = [item["avg_throttle_speed"] for item in sorted_laps_1]
+    speeds_o2 = [item["avg_throttle_speed"] for item in sorted_laps_2]
 
     avg_speed_o1 = sum(speeds_o1) / len(speeds_o1) if speeds_o1 else 0.0
     avg_speed_o2 = sum(speeds_o2) / len(speeds_o2) if speeds_o2 else 0.0
@@ -54,22 +57,14 @@ def plot_throttle_comparison(data_o1, data_o2):
     apply_shared_y_limits(ax1, [data_o1["avg_pct"]], [data_o2["avg_pct"]])
     ax1.grid(axis="y", linestyle="--", alpha=0.6)
 
-    # Right: Lap-by-Lap Scatter
-    for name, data in outings:
-        laps = [item["lap_num"] for item in data["laps"]]
-        pcts = [item["pct"] for item in data["laps"]]
-        ax2.scatter(
-            laps,
-            pcts,
-            color=COLORS[name],
-            label=name,
-            **SCATTER_STYLE,
-        )
+    # Right: Lap-by-Lap Scatter (using remapped lap numbers and sorted metrics)
+    ax2.scatter(laps_o1, pcts_o1, color=COLORS["Outing 1"], label="Outing 1", **SCATTER_STYLE)
+    ax2.scatter(laps_o2, pcts_o2, color=COLORS["Outing 2"], label="Outing 2", **SCATTER_STYLE)
 
     ax2.set_title(
         f"Per-lap Full Throttle % (>= {THROTTLE_THRESHOLD:.0f}%)", fontsize=11, pad=12
     )
-    ax2.set_xlabel("Lap Number", fontsize=10)
+    ax2.set_xlabel("Lap", fontsize=10)
     ax2.set_ylabel("Full Throttle %", fontsize=10)
     apply_shared_y_limits(ax2, pcts_o1, pcts_o2)
     ax2.grid(True, linestyle="--", alpha=0.6)
@@ -103,29 +98,21 @@ def plot_throttle_comparison(data_o1, data_o2):
     apply_shared_y_limits(ax3, [avg_speed_o1], [avg_speed_o2])
     ax3.grid(axis="y", linestyle="--", alpha=0.6)
 
-    # Right: Lap-by-Lap Scatter
-    for name, data in outings:
-        laps = [item["lap_num"] for item in data["laps"]]
-        speeds = [item["avg_throttle_speed"] for item in data["laps"]]
-        ax4.scatter(
-            laps,
-            speeds,
-            color=COLORS[name],
-            label=name,
-            **SCATTER_STYLE,
-        )
+    # Right: Lap-by-Lap Scatter (using remapped lap numbers and sorted metrics)
+    ax4.scatter(laps_o1, speeds_o1, color=COLORS["Outing 1"], label="Outing 1", **SCATTER_STYLE)
+    ax4.scatter(laps_o2, speeds_o2, color=COLORS["Outing 2"], label="Outing 2", **SCATTER_STYLE)
 
     ax4.set_title(
         "Avg Throttle Application Speed per Lap", fontsize=11, pad=12
     )
-    ax4.set_xlabel("Lap Number", fontsize=10)
+    ax4.set_xlabel("Lap", fontsize=10)
     ax4.set_ylabel("Throttle Speed (%/s)", fontsize=10)
     apply_shared_y_limits(ax4, speeds_o1, speeds_o2)
     ax4.grid(True, linestyle="--", alpha=0.6)
     ax4.legend(loc="best", fontsize=10)
 
-    # Shared X-ticks formatting for scatter axes
-    all_laps = sorted(list(set([item["lap_num"] for name, data in outings for item in data["laps"]])))
+    # 3. Shared X-ticks formatting based on the remapped lap values
+    all_laps = sorted(list(set(laps_o1 + laps_o2)))
     if all_laps:
         ticks = range(min(all_laps), max(all_laps) + 1)
         ax2.set_xticks(ticks)
