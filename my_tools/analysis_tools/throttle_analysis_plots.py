@@ -105,7 +105,6 @@ def plot_throttle_comparison(data_o1, data_o2):
         ax2.set_xticks(ticks)
         ax4.set_xticks(ticks)
 
-    plt.tight_layout()
     fig.canvas.manager.set_window_title("Throttle Analysis - Outing Comparison")
 
 

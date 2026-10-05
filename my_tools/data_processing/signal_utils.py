@@ -133,7 +133,7 @@ PLOT_COLORS = {"Outing 1": "#1f77b4", "Outing 2": "#ff7f0e"}
 SCATTER_STYLE = {"s": 70, "alpha": 0.85, "edgecolor": "black", "linewidth": 0.8}
 
 def apply_global_plot_style():
-    """Applies centralized typography and layout defaults across all telemetry figures."""
+    """Applies centralized typography, layout defaults, and subplot geometry across all telemetry figures."""
     import matplotlib.pyplot as plt
     plt.rcParams.update({
         'font.size': 10,
@@ -143,4 +143,10 @@ def apply_global_plot_style():
         'ytick.labelsize': 9,
         'legend.fontsize': 10,
         'axes.titlepad': 12,
+        'figure.subplot.left': 0.22,
+        'figure.subplot.bottom': 0.057,
+        'figure.subplot.right': 0.7,
+        'figure.subplot.top': 0.957,
+        'figure.subplot.wspace': 0.270,
+        'figure.subplot.hspace': 0.270,
     })

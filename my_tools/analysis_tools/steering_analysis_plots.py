@@ -179,7 +179,6 @@ def run_steering_analysis(outing1_files, outing2_files):
         ax2.set_xticks(ticks)
         ax4.set_xticks(ticks)
 
-    plt.tight_layout()
     fig.canvas.manager.set_window_title("Steering & Trajectory Analysis")
 
 

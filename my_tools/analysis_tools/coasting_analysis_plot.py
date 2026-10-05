@@ -115,7 +115,6 @@ def run_coasting_analysis(outing1_files, outing2_files):
     ax2.grid(True, linestyle="--", alpha=0.6)
     ax2.legend(loc="best")
 
-    plt.tight_layout()
     fig.canvas.manager.set_window_title("Coasting Analysis - Outing Comparison")
 
 

@@ -176,7 +176,6 @@ def run_brake_analysis(outing1_files, outing2_files):
         ax2.set_xticks(ticks)
         ax4.set_xticks(ticks)
 
-    plt.tight_layout()
     fig.canvas.manager.set_window_title("Brake Dynamics Analysis")
 
 
