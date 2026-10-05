@@ -2,18 +2,20 @@ import matplotlib.pyplot as plt
 from my_tools.data_processing.signal_utils import (
     apply_shared_y_limits,
     get_outing_files,
-    remap_outing_laps,  # Import the remapping helper from signal_utils
+    remap_outing_laps,
+    PLOT_COLORS,
+    SCATTER_STYLE,
+    apply_global_plot_style,
 )
 from my_tools.data_processing.telemetry_processor import process_outing_throttle
 
 SMOOTH_SAMPLES = 9
 THROTTLE_THRESHOLD = 95.0
-COLORS = {"Outing 1": "#1f77b4", "Outing 2": "#ff7f0e"}
-SCATTER_STYLE = {"s": 80, "alpha": 0.85, "edgecolor": "black", "linewidth": 0.8}
 
 
 def run_coasting_analysis(outing1_files, outing2_files):
     """Processes pre-braking coasting percentage relative to lap time and renders 2-panel comparison."""
+    apply_global_plot_style()
     data_o1 = process_outing_throttle(
         outing1_files,
         "Outing 1",
@@ -30,10 +32,8 @@ def run_coasting_analysis(outing1_files, outing2_files):
     if not data_o1 or not data_o2:
         return
 
-    # Use remap_outing_laps to get chronologically sorted laps and correct numbering mode x-values
     laps_o1, laps_o2, sorted_laps_1, sorted_laps_2 = remap_outing_laps(data_o1, data_o2)
 
-    # Compute lap percentages from the sorted laps
     pcts_o1 = [
         (
             (item["total_coasting_time"] / item["total_lap_time"] * 100.0)
@@ -53,7 +53,6 @@ def run_coasting_analysis(outing1_files, outing2_files):
 
     avg_pct_o1 = sum(pcts_o1) / len(pcts_o1) if pcts_o1 else 0.0
     avg_pct_o2 = sum(pcts_o2) / len(pcts_o2) if pcts_o2 else 0.0
-
     all_lap_pcts = pcts_o1 + pcts_o2
 
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 5))
@@ -62,7 +61,7 @@ def run_coasting_analysis(outing1_files, outing2_files):
     bars = ax1.bar(
         [0, 1],
         [avg_pct_o1, avg_pct_o2],
-        color=[COLORS["Outing 1"], COLORS["Outing 2"]],
+        color=[PLOT_COLORS["Outing 1"], PLOT_COLORS["Outing 2"]],
         edgecolor="black",
         linewidth=1.2,
     )
@@ -79,8 +78,8 @@ def run_coasting_analysis(outing1_files, outing2_files):
 
     ax1.set_xticks([0, 1])
     ax1.set_xticklabels(["Outing 1", "Outing 2"])
-    ax1.set_title("Average Pre-Braking Coasting Time", fontsize=11, pad=12)
-    ax1.set_ylabel("Coasting Time (% of Lap Time)", fontsize=10)
+    ax1.set_title("Average Pre-Braking Coasting Time")
+    ax1.set_ylabel("Coasting Time (% of Lap Time)")
     apply_shared_y_limits(ax1, [avg_pct_o1], [avg_pct_o2])
     ax1.grid(axis="y", linestyle="--", alpha=0.6)
 
@@ -88,7 +87,7 @@ def run_coasting_analysis(outing1_files, outing2_files):
     ax2.scatter(
         laps_o1,
         pcts_o1,
-        color=COLORS["Outing 1"],
+        color=PLOT_COLORS["Outing 1"],
         label="Outing 1",
         zorder=3,
         **SCATTER_STYLE,
@@ -96,7 +95,7 @@ def run_coasting_analysis(outing1_files, outing2_files):
     ax2.scatter(
         laps_o2,
         pcts_o2,
-        color=COLORS["Outing 2"],
+        color=PLOT_COLORS["Outing 2"],
         label="Outing 2",
         zorder=3,
         **SCATTER_STYLE,
@@ -105,21 +104,16 @@ def run_coasting_analysis(outing1_files, outing2_files):
     max_pct = max(all_lap_pcts) if all_lap_pcts else 10.0
     ax2.set_ylim(bottom=0, top=max_pct * 1.3)
 
-    ax2.set_title(
-        "Pre-Braking Coasting Time (% of Total Lap Time) per Lap",
-        fontsize=11,
-        pad=12,
-    )
-    ax2.set_xlabel("Lap", fontsize=10)
-    ax2.set_ylabel("Coasting Time (% of Lap Time)", fontsize=10)
+    ax2.set_title("Pre-Braking Coasting Time (% of Total Lap Time) per Lap")
+    ax2.set_xlabel("Lap")
+    ax2.set_ylabel("Coasting Time (% of Lap Time)")
 
-    # Shared X-ticks formatting based on the remapped lap values
     all_laps = sorted(list(set(laps_o1 + laps_o2)))
     if all_laps:
         ax2.set_xticks(range(min(all_laps), max(all_laps) + 1))
 
     ax2.grid(True, linestyle="--", alpha=0.6)
-    ax2.legend(loc="best", fontsize=10)
+    ax2.legend(loc="best")
 
     plt.tight_layout()
     fig.canvas.manager.set_window_title("Coasting Analysis - Outing Comparison")

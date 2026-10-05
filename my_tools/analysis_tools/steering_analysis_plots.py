@@ -3,18 +3,20 @@ from my_tools.data_processing.signal_utils import (
     apply_shared_y_limits,
     get_outing_files,
     remap_lap_lists,
+    PLOT_COLORS,
+    SCATTER_STYLE,
+    apply_global_plot_style,
 )
 from my_tools.data_processing.telemetry_processor import (
     process_outing_steering_and_curvature,
 )
 
-COLORS = {"Outing 1": "#1f77b4", "Outing 2": "#ff7f0e"}
-SCATTER_STYLE = {"s": 60, "alpha": 0.85, "edgecolor": "k", "linewidth": 0.8}
 MIN_STEER_THRESHOLD = 10.0
 
 
 def run_steering_analysis(outing1_files, outing2_files):
     """Processes steering and trajectory curvature telemetry and renders the 4-panel comparison figure."""
+    apply_global_plot_style()
     laps_steer_o1, steer_speed_o1, laps_curv_o1, curvature_o1 = (
         process_outing_steering_and_curvature(
             outing1_files,
@@ -32,7 +34,6 @@ def run_steering_analysis(outing1_files, outing2_files):
         )
     )
 
-    # Remap lap numbers globally based on config (sequential vs straight)
     (
         laps_steer_o1,
         laps_curv_o1,
@@ -42,7 +43,6 @@ def run_steering_analysis(outing1_files, outing2_files):
         laps_steer_o1, laps_curv_o1, laps_steer_o2, laps_curv_o2
     )
 
-    # Compute outing averages
     avg_steer_o1 = (
         sum(steer_speed_o1) / len(steer_speed_o1) if steer_speed_o1 else 0.0
     )
@@ -60,11 +60,10 @@ def run_steering_analysis(outing1_files, outing2_files):
     fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(16, 10))
 
     # --- ROW 1: Steering Speed ---
-    # Left: Bar Chart of Averages
     bars1 = ax1.bar(
         [0, 1],
         [avg_steer_o1, avg_steer_o2],
-        color=[COLORS["Outing 1"], COLORS["Outing 2"]],
+        color=[PLOT_COLORS["Outing 1"], PLOT_COLORS["Outing 2"]],
         edgecolor="black",
         linewidth=1.2,
     )
@@ -80,17 +79,16 @@ def run_steering_analysis(outing1_files, outing2_files):
         )
     ax1.set_xticks([0, 1])
     ax1.set_xticklabels(["Outing 1", "Outing 2"])
-    ax1.set_title("Average Absolute Steering Rate", fontsize=11, pad=12)
-    ax1.set_ylabel("Steering Rate (deg/s)", fontsize=10)
+    ax1.set_title("Average Absolute Steering Rate")
+    ax1.set_ylabel("Steering Rate (deg/s)")
     apply_shared_y_limits(ax1, [avg_steer_o1], [avg_steer_o2])
     ax1.grid(axis="y", linestyle="--", alpha=0.6)
 
-    # Right: Lap-by-Lap Scatter
     if laps_steer_o1:
         ax2.scatter(
             laps_steer_o1,
             steer_speed_o1,
-            color=COLORS["Outing 1"],
+            color=PLOT_COLORS["Outing 1"],
             label="Outing 1",
             **SCATTER_STYLE,
         )
@@ -98,7 +96,7 @@ def run_steering_analysis(outing1_files, outing2_files):
         ax2.scatter(
             laps_steer_o2,
             steer_speed_o2,
-            color=COLORS["Outing 2"],
+            color=PLOT_COLORS["Outing 2"],
             label="Outing 2",
             **SCATTER_STYLE,
         )
@@ -107,22 +105,18 @@ def run_steering_analysis(outing1_files, outing2_files):
     max_steer = max(all_steer) if all_steer else 70.0
     ax2.set_ylim(bottom=20, top=max_steer * 1.3)
     ax2.set_title(
-        f"Average Absolute Steering Rate per Lap (≥{MIN_STEER_THRESHOLD:.0f} deg/s)",
-        fontsize=11,
-        pad=12,
+        f"Average Absolute Steering Rate per Lap (≥{MIN_STEER_THRESHOLD:.0f} deg/s)"
     )
-    ax2.set_xlabel("Lap", fontsize=10)
-    ax2.set_ylabel("Steering Rate (deg/s)", fontsize=10)
+    ax2.set_xlabel("Lap")
+    ax2.set_ylabel("Steering Rate (deg/s)")
     ax2.grid(True, linestyle="--", alpha=0.6)
-    ax2.legend(loc="best", fontsize=10)
-
+    ax2.legend(loc="best")
 
     # --- ROW 2: Trajectory Curvature ---
-    # Left: Bar Chart of Averages
     bars2 = ax3.bar(
         [0, 1],
         [avg_curv_o1, avg_curv_o2],
-        color=[COLORS["Outing 1"], COLORS["Outing 2"]],
+        color=[PLOT_COLORS["Outing 1"], PLOT_COLORS["Outing 2"]],
         edgecolor="black",
         linewidth=1.2,
     )
@@ -138,17 +132,16 @@ def run_steering_analysis(outing1_files, outing2_files):
         )
     ax3.set_xticks([0, 1])
     ax3.set_xticklabels(["Outing 1", "Outing 2"])
-    ax3.set_title("Average Trajectory Curvature", fontsize=11, pad=12)
-    ax3.set_ylabel("Curvature r (1/m)", fontsize=10)
+    ax3.set_title("Average Trajectory Curvature")
+    ax3.set_ylabel("Curvature r (1/m)")
     apply_shared_y_limits(ax3, [avg_curv_o1], [avg_curv_o2])
     ax3.grid(axis="y", linestyle="--", alpha=0.6)
 
-    # Right: Lap-by-Lap Scatter
     if laps_curv_o1:
         ax4.scatter(
             laps_curv_o1,
             curvature_o1,
-            color=COLORS["Outing 1"],
+            color=PLOT_COLORS["Outing 1"],
             label="Outing 1",
             **SCATTER_STYLE,
         )
@@ -156,7 +149,7 @@ def run_steering_analysis(outing1_files, outing2_files):
         ax4.scatter(
             laps_curv_o2,
             curvature_o2,
-            color=COLORS["Outing 2"],
+            color=PLOT_COLORS["Outing 2"],
             label="Outing 2",
             **SCATTER_STYLE,
         )
@@ -165,18 +158,12 @@ def run_steering_analysis(outing1_files, outing2_files):
     max_curv = max(all_curv) if all_curv else 0.05
     min_curv = min(all_curv) if all_curv else 0.0
     ax4.set_ylim(bottom=min_curv * 0.7 if min_curv > 0 else 0, top=max_curv * 1.3)
-    ax4.set_title(
-        "Average Trajectory Curvature per Lap (r = |G_lat| / V²)",
-        fontsize=11,
-        pad=12,
-    )
-    ax4.set_xlabel("Lap", fontsize=10)
-    ax4.set_ylabel("Curvature r (1/m)", fontsize=10)
+    ax4.set_title("Average Trajectory Curvature per Lap (r = |G_lat| / V²)")
+    ax4.set_xlabel("Lap")
+    ax4.set_ylabel("Curvature r (1/m)")
     ax4.grid(True, linestyle="--", alpha=0.6)
-    ax4.legend(loc="best", fontsize=10)
+    ax4.legend(loc="best")
 
-
-    # Shared X-ticks formatting for scatter axes
     all_laps = sorted(
         list(
             set(

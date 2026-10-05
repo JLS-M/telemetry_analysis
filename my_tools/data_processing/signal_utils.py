@@ -126,3 +126,21 @@ def remap_lap_lists(laps_steer_1, laps_curv_1, laps_steer_2, laps_curv_2):
     mapped_curv_2 = [map_2[l] for l in laps_curv_2] if laps_curv_2 else []
 
     return mapped_steer_1, mapped_curv_1, mapped_steer_2, mapped_curv_2
+
+
+# --- CENTRALIZED PLOTTING STYLES ---
+PLOT_COLORS = {"Outing 1": "#1f77b4", "Outing 2": "#ff7f0e"}
+SCATTER_STYLE = {"s": 70, "alpha": 0.85, "edgecolor": "black", "linewidth": 0.8}
+
+def apply_global_plot_style():
+    """Applies centralized typography and layout defaults across all telemetry figures."""
+    import matplotlib.pyplot as plt
+    plt.rcParams.update({
+        'font.size': 10,
+        'axes.titlesize': 11,
+        'axes.labelsize': 10,
+        'xtick.labelsize': 9,
+        'ytick.labelsize': 9,
+        'legend.fontsize': 10,
+        'axes.titlepad': 12,
+    })
